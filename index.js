@@ -31,12 +31,47 @@ app.post("/api/v1/users", async (req, res) => {
   try {
     const { name, email, password, bio } = req.body;
 
-    const hashedPassword = await bcrypt.hash(password, 10); // Cifrado de contraseña
-    const newUser = new User({ name, email, password: hashedPassword, bio });
+    // Cifrar la contraseña antes de guardarla en la base de datos
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Crear usuario con active: false por defecto
+    const newUser = new User({
+      name,
+      email,
+      password: hashedPassword,
+      bio,
+      active: false,
+    });
     await newUser.save();
-    res.status(201).json(newUser);
+
+    // Enlace simulado para activar la cuenta (solo en consola)
+    console.log(
+      `User activation link: http://localhost:8000/api/v1/users/activate/${newUser._id}`
+    );
+
+    res
+      .status(201)
+      .json({
+        message: "User created. Check activation link in console.",
+        user: newUser,
+      });
   } catch (error) {
     res.status(400).json({ error: "Invalid data or missing fields" });
+  }
+});
+
+// ----------- Actividad 4 --------------
+// GET: Activar usuario mediante enlace
+app.get("/api/v1/users/activate/:id", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    user.active = true; // Cambiar a true el campo 'active'
+    await user.save();
+    res.status(200).json({ message: "User activated successfully" });
+  } catch (error) {
+    res.status(400).json({ error: "Invalid ID" });
   }
 });
 
@@ -47,6 +82,8 @@ app.post("/api/v1/login", async (req, res) => {
   try {
     const user = await User.findOne({ email });
     if (!user) return res.status(401).json({ error: "Invalid credentials" });
+    if (!user.active)
+      return res.status(403).json({ error: "Account not activated" });
 
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword)
@@ -66,7 +103,6 @@ app.post("/api/v1/login", async (req, res) => {
 
 // --- Endpoints CRUD de Posts protegidos por autenticación JWT ---
 
-// POST: Crear un nuevo post
 app.post("/api/v1/posts", authenticateToken, async (req, res) => {
   try {
     const { title, text, author } = req.body;
@@ -78,13 +114,11 @@ app.post("/api/v1/posts", authenticateToken, async (req, res) => {
   }
 });
 
-// GET: Obtener todos los posts
 app.get("/api/v1/posts", authenticateToken, async (req, res) => {
   const posts = await Post.find();
   res.status(200).json(posts);
 });
 
-// GET: Obtener un post por ID
 app.get("/api/v1/posts/:id", authenticateToken, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
@@ -95,7 +129,6 @@ app.get("/api/v1/posts/:id", authenticateToken, async (req, res) => {
   }
 });
 
-// PATCH: Actualizar un post por ID
 app.patch("/api/v1/posts/:id", authenticateToken, async (req, res) => {
   try {
     const updatedPost = await Post.findByIdAndUpdate(req.params.id, req.body, {
@@ -108,7 +141,6 @@ app.patch("/api/v1/posts/:id", authenticateToken, async (req, res) => {
   }
 });
 
-// DELETE: Eliminar un post por ID
 app.delete("/api/v1/posts/:id", authenticateToken, async (req, res) => {
   try {
     const deletedPost = await Post.findByIdAndDelete(req.params.id);
@@ -119,13 +151,12 @@ app.delete("/api/v1/posts/:id", authenticateToken, async (req, res) => {
   }
 });
 
-// PATCH: Incrementar vistas de un post
 app.patch("/api/v1/posts/:id/view", authenticateToken, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ error: "Post not found" });
 
-    post.views += 1; // Incrementar vistas
+    post.views += 1;
     await post.save();
     res.status(200).json(post);
   } catch (error) {
@@ -133,20 +164,22 @@ app.patch("/api/v1/posts/:id/view", authenticateToken, async (req, res) => {
   }
 });
 
-// Iniciar servidor
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
 
-// Configuración de MongoMemoryServer
 const startMongoServer = async () => {
   const mongoServer = await MongoMemoryServer.create();
   const mongoUri = mongoServer.getUri();
 
   mongoose
     .connect(mongoUri)
-    .then(() => console.log("Connected to MongoDB in-memory"))
-    .catch((error) => console.error("MongoDB connection error:", error));
+    .then(() => {
+      console.log("Connected to MongoDB in-memory");
+    })
+    .catch((error) => {
+      console.error("MongoDB connection error:", error);
+    });
 };
 
 startMongoServer();
