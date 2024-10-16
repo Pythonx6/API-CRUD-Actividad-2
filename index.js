@@ -8,7 +8,7 @@ const User = require("./models/User"); // Importar el modelo User
 
 const app = express();
 const port = 8000;
-const JWT_SECRET = "mySecretKey"; // Usar una clave secreta para firmar el JWT (cambiar a algo más seguro)
+const JWT_SECRET = "mySecretKey"; // Usar una clave secreta para firmar el JWT
 
 // Middleware para parsear JSON
 app.use(express.json());
@@ -31,9 +31,7 @@ app.post("/api/v1/users", async (req, res) => {
   try {
     const { name, email, password, bio } = req.body;
 
-    // Cifrar la contraseña antes de guardarla en la base de datos
-    const hashedPassword = await bcrypt.hash(password, 10);
-
+    const hashedPassword = await bcrypt.hash(password, 10); // Cifrado de contraseña
     const newUser = new User({ name, email, password: hashedPassword, bio });
     await newUser.save();
     res.status(201).json(newUser);
@@ -54,7 +52,6 @@ app.post("/api/v1/login", async (req, res) => {
     if (!validPassword)
       return res.status(401).json({ error: "Invalid credentials" });
 
-    // Crear un token JWT
     const token = jwt.sign(
       { userId: user._id, email: user.email },
       JWT_SECRET,
@@ -69,7 +66,7 @@ app.post("/api/v1/login", async (req, res) => {
 
 // --- Endpoints CRUD de Posts protegidos por autenticación JWT ---
 
-// POST: Crear un nuevo post (requiere autenticación)
+// POST: Crear un nuevo post
 app.post("/api/v1/posts", authenticateToken, async (req, res) => {
   try {
     const { title, text, author } = req.body;
@@ -81,13 +78,13 @@ app.post("/api/v1/posts", authenticateToken, async (req, res) => {
   }
 });
 
-// GET: Obtener todos los posts (requiere autenticación)
+// GET: Obtener todos los posts
 app.get("/api/v1/posts", authenticateToken, async (req, res) => {
   const posts = await Post.find();
   res.status(200).json(posts);
 });
 
-// GET: Obtener un post por ID (requiere autenticación)
+// GET: Obtener un post por ID
 app.get("/api/v1/posts/:id", authenticateToken, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
@@ -98,7 +95,7 @@ app.get("/api/v1/posts/:id", authenticateToken, async (req, res) => {
   }
 });
 
-// PATCH: Actualizar un post por ID (requiere autenticación)
+// PATCH: Actualizar un post por ID
 app.patch("/api/v1/posts/:id", authenticateToken, async (req, res) => {
   try {
     const updatedPost = await Post.findByIdAndUpdate(req.params.id, req.body, {
@@ -111,7 +108,7 @@ app.patch("/api/v1/posts/:id", authenticateToken, async (req, res) => {
   }
 });
 
-// DELETE: Eliminar un post por ID (requiere autenticación)
+// DELETE: Eliminar un post por ID
 app.delete("/api/v1/posts/:id", authenticateToken, async (req, res) => {
   try {
     const deletedPost = await Post.findByIdAndDelete(req.params.id);
@@ -122,13 +119,13 @@ app.delete("/api/v1/posts/:id", authenticateToken, async (req, res) => {
   }
 });
 
-// PATCH: Incrementar el contador de vistas de un post (requiere autenticación)
+// PATCH: Incrementar vistas de un post
 app.patch("/api/v1/posts/:id/view", authenticateToken, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ error: "Post not found" });
 
-    post.views += 1; // Incrementa el contador de vistas
+    post.views += 1; // Incrementar vistas
     await post.save();
     res.status(200).json(post);
   } catch (error) {
@@ -136,24 +133,20 @@ app.patch("/api/v1/posts/:id/view", authenticateToken, async (req, res) => {
   }
 });
 
-// Iniciar el servidor
+// Iniciar servidor
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
 
-// Configuración de MongoMemoryServer para MongoDB en memoria
+// Configuración de MongoMemoryServer
 const startMongoServer = async () => {
   const mongoServer = await MongoMemoryServer.create();
   const mongoUri = mongoServer.getUri();
 
   mongoose
     .connect(mongoUri)
-    .then(() => {
-      console.log("Connected to MongoDB in-memory");
-    })
-    .catch((error) => {
-      console.error("MongoDB connection error:", error);
-    });
+    .then(() => console.log("Connected to MongoDB in-memory"))
+    .catch((error) => console.error("MongoDB connection error:", error));
 };
 
 startMongoServer();
